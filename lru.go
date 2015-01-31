@@ -15,6 +15,7 @@ type Cache struct {
 	evictList *list.List
 	items     map[interface{}]*list.Element
 	lock      sync.Mutex
+	callback  Callback
 }
 
 // entry is used to hold a value in the evictList
@@ -23,8 +24,11 @@ type entry struct {
 	value interface{}
 }
 
+// Callback is callback func. this will be called when the item is cached out.
+type Callback func(key, value interface{})
+
 // New creates an LRU of the given size
-func New(size int) (*Cache, error) {
+func New(size int, callback Callback) (*Cache, error) {
 	if size <= 0 {
 		return nil, errors.New("Must provide a positive size")
 	}
@@ -32,6 +36,7 @@ func New(size int) (*Cache, error) {
 		size:      size,
 		evictList: list.New(),
 		items:     make(map[interface{}]*list.Element, size),
+		callback: callback,
 	}
 	return c, nil
 }
@@ -124,6 +129,9 @@ func (c *Cache) removeElement(e *list.Element) {
 	c.evictList.Remove(e)
 	kv := e.Value.(*entry)
 	delete(c.items, kv.key)
+	if c.callback != nil {
+		c.callback(kv.key, kv.value)
+	}
 }
 
 // Len returns the number of items in the cache.
